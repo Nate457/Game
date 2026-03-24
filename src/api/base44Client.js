@@ -13,7 +13,7 @@ const firebaseConfig = {
   measurementId: "G-STBQ1JTVHX"
 };
 
-const GEMINI_API_KEY = "AIzaSyCy39_ATqV3uVFhdX4XVF23GhalcpjAQhM";
+const GEMINI_API_KEY = "AIzaSyCTBCPcL6GuZWDI3T9FhSUaQOyZs2QTG-Q";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
