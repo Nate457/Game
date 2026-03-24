@@ -577,8 +577,8 @@ const handleJoinSession = (sessionId, hostStatus) => {
         {activeTab === "combat" ? (
           <RealTimeCombat
             character={character}
-            enemyData={currentEnemy} // Solo enemy
-            sessionId={coopSessionId} // Multiplayer ID
+            enemyData={currentEnemy}
+            sessionId={coopSessionId}
             isHost={isHost}
             onCombatEnd={handleCombatEnd}
             onFlee={handleFlee}
