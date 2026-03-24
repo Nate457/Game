@@ -9,12 +9,8 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sword, Shield, Heart, Zap, ChevronRight, Wind, Target, Play, ArrowLeft } from "lucide-react";
 
 const statIcons = { 
-  max_hp: Heart, 
-  max_mana: Zap, 
-  attack: Sword, 
-  defense: Shield,
-  speed: Wind,
-  crit_chance: Target
+  max_hp: Heart, max_mana: Zap, attack: Sword, 
+  defense: Shield, speed: Wind, crit_chance: Target
 };
 
 export default function CharacterCreate() {
@@ -26,7 +22,6 @@ export default function CharacterCreate() {
   const [creating, setCreating] = useState(false);
   const [forceNew, setForceNew] = useState(false);
 
-  // Check if the player already has a character saved
   const { data: characters, isLoading } = useQuery({
     queryKey: ["characters"],
     queryFn: () => base44.entities.Character.list("-created_date", 1),
@@ -37,38 +32,43 @@ export default function CharacterCreate() {
   const handleCreate = async () => {
     if (!name.trim() || !selectedClass) return;
     setCreating(true);
-    const stats = getStatsForLevel(selectedClass, 1);
     
-    await base44.entities.Character.create({
-      name: name.trim(),
-      class_type: selectedClass,
-      level: 1,
-      xp: 0,
-      xp_to_next: 100,
-      ...stats,
-      current_hp: stats.max_hp,
-      current_mana: stats.max_mana,
-      gold: 10,
-      current_zone: "whispering_woods",
-      inventory: [],
-      equipped: {},
-      quests_completed: 0,
-      enemies_defeated: 0,
-      story_context: "A new adventurer has arrived in the Whispering Woods, seeking glory and answers about the growing darkness.",
-      unlocked_zones: ["whispering_woods"],
-    });
+    try {
+      const stats = getStatsForLevel(selectedClass, 1);
+      const newChar = await base44.entities.Character.create({
+        name: name.trim(),
+        class_type: selectedClass,
+        level: 1,
+        xp: 0,
+        xp_to_next: 100,
+        ...stats,
+        current_hp: stats.max_hp,
+        current_mana: stats.max_mana,
+        gold: 10,
+        current_zone: "whispering_woods",
+        inventory: [],
+        equipped: {},
+        quests_completed: 0,
+        enemies_defeated: 0,
+        story_context: "A new adventurer has arrived in the Whispering Woods, seeking glory and answers about the growing darkness.",
+        unlocked_zones: ["whispering_woods"],
+      });
 
-    // CRITICAL FIX: Wipe the cache so GameWorld knows the character exists!
-    await queryClient.invalidateQueries({ queryKey: ["characters"] });
-    
-    navigate("/game");
+      // FIX: Inject the character directly into the cache to stop the kick-out loop
+      queryClient.setQueryData(["characters"], [newChar]);
+      navigate("/game");
+      
+    } catch (error) {
+      console.error("Firebase Error:", error);
+      alert("Failed to save character: " + error.message);
+      setCreating(false); // Stop the infinite spinning
+    }
   };
 
   const handleContinue = () => {
     navigate("/game");
   };
 
-  // Show a loading spinner while checking the database
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -77,7 +77,6 @@ export default function CharacterCreate() {
     );
   }
 
-  // Welcome Back / Continue Screen
   if (existingCharacter && !forceNew) {
     const cls = CLASSES[existingCharacter.class_type];
     return (
