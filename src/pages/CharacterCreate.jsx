@@ -5,9 +5,18 @@ import { CLASSES, getStatsForLevel } from "@/lib/gameData";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sword, Shield, Heart, Zap, ChevronRight } from "lucide-react";
+// Added Wind and Target to the imports
+import { Sword, Shield, Heart, Zap, ChevronRight, Wind, Target } from "lucide-react";
 
-const statIcons = { max_hp: Heart, max_mana: Zap, attack: Sword, defense: Shield };
+// Added speed and crit_chance to the icon dictionary
+const statIcons = { 
+  max_hp: Heart, 
+  max_mana: Zap, 
+  attack: Sword, 
+  defense: Shield,
+  speed: Wind,
+  crit_chance: Target
+};
 
 export default function CharacterCreate() {
   const [name, setName] = useState("");
@@ -120,6 +129,10 @@ export default function CharacterCreate() {
                   <div className="grid grid-cols-2 gap-3">
                     {Object.entries(getStatsForLevel(selectedClass, 1)).map(([stat, val]) => {
                       const Icon = statIcons[stat];
+                      
+                      // Added null guard to prevent crashes
+                      if (!Icon) return null; 
+
                       return (
                         <div key={stat} className="flex items-center gap-2">
                           <Icon className="w-4 h-4 text-primary/70" />

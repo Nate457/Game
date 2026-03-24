@@ -6,28 +6,37 @@ const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true);
+  const [isLoadingPublicSettings] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
       try {
-        // Automatically "log in" the local user
-        const localUser = await base44.user.get();
-        setUser(localUser);
+        const currentUser = await base44.auth.me();
+        setUser(currentUser);
       } catch (error) {
-        console.error("Auth init failed", error);
+        console.error('Auth failed', error);
       } finally {
-        setLoading(false);
+        setIsLoadingAuth(false);
       }
     };
     initAuth();
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, authenticated: !!user }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      isAuthenticated: !!user, 
+      isLoadingAuth,
+      isLoadingPublicSettings,
+    }}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (!context) throw new Error('useAuth must be used within an AuthProvider');
+  return context;
+};

@@ -1,53 +1,111 @@
 // src/api/base44Client.js
+import { initializeApp } from "firebase/app";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, query, orderBy, limit, where } from "firebase/firestore";
+import { getAuth, signInAnonymously } from "firebase/auth";
 
-// Mocking the base44 SDK structure using localStorage for local persistence
-const getLocal = (key) => JSON.parse(localStorage.getItem(key) || '[]');
-const setLocal = (key, data) => localStorage.setItem(key, JSON.stringify(data));
+// 1. TODO: GET YOUR FIREBASE CONFIG FROM console.firebase.google.com
+const firebaseConfig = {
+  apiKey: "AIzaSyD2VD5SlfT8skI1i0v7hN3xCdiXZ7LRY3g",
+  authDomain: "game-10c46.firebaseapp.com",
+  projectId: "game-10c46",
+  storageBucket: "game-10c46.firebasestorage.app",
+  messagingSenderId: "825671982649",
+  appId: "1:825671982649:web:e868151ba6a13105bd37e8",
+  measurementId: "G-STBQ1JTVHX"
+};
+
+// 2. TODO: GET A FREE GEMINI API KEY FROM aistudio.google.com
+const GEMINI_API_KEY = "AIzaSyCy39_ATqV3uVFhdX4XVF23GhalcpjAQhM";
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
 
 export const base44 = {
-  user: {
-    // Returns a dummy local user so AuthContext remains functional
-    get: async () => ({ id: "local-user-001", email: "local@player.game", name: "Local Player" })
+  auth: {
+    me: async () => {
+      return new Promise((resolve, reject) => {
+        auth.onAuthStateChanged(user => {
+          if (user) resolve({ id: user.uid, name: "Player" });
+          else signInAnonymously(auth).then(c => resolve({ id: c.user.uid })).catch(reject);
+        });
+      });
+    }
+  },
+  integrations: {
+    Core: {
+      InvokeLLM: async ({ prompt, response_json_schema }) => {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              responseSchema: response_json_schema
+            }
+          })
+        });
+        const data = await res.json();
+        return JSON.parse(data.candidates[0].content.parts[0].text);
+      }
+    }
   },
   entities: {
     Character: {
-      list: async () => {
-        const chars = getLocal('game_characters');
-        // Sort by created_date descending as the original code expects
-        return chars.sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
+      list: async (sortStr) => {
+        let q = collection(db, "characters");
+        // If sorting by created_date, the game is looking for YOUR character
+        if (sortStr === "-created_date") {
+          q = query(q, where("userId", "==", auth.currentUser.uid), orderBy("created_date", "desc"), limit(1));
+        } else {
+          // Otherwise, it's looking for all characters for the Co-op lobby
+          q = query(q, orderBy("level", "desc"), limit(50));
+        }
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       },
       create: async (data) => {
-        const chars = getLocal('game_characters');
-        const newChar = { ...data, id: Math.random().toString(36).substr(2, 9), created_date: new Date().toISOString() };
-        setLocal('game_characters', [...chars, newChar]);
-        return newChar;
+        const docRef = await addDoc(collection(db, "characters"), {
+          ...data,
+          userId: auth.currentUser.uid,
+          created_date: new Date().toISOString()
+        });
+        return { id: docRef.id, ...data };
       },
       update: async (id, data) => {
-        const chars = getLocal('game_characters');
-        const index = chars.findIndex(c => c.id === id);
-        if (index > -1) {
-          chars[index] = { ...chars[index], ...data };
-          setLocal('game_characters', chars);
-        }
-        return chars[index];
+        await updateDoc(doc(db, "characters", id), data);
+        return { id, ...data };
       }
     },
     Leaderboard: {
-      list: async () => getLocal('game_leaderboard'),
+      list: async () => {
+        const snap = await getDocs(query(collection(db, "leaderboard"), orderBy("level", "desc"), limit(50)));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      },
       create: async (data) => {
-        const board = getLocal('game_leaderboard');
-        const entry = { ...data, id: Math.random().toString(36).substr(2, 9) };
-        setLocal('game_leaderboard', [...board, entry]);
-        return entry;
+        const docRef = await addDoc(collection(db, "leaderboard"), data);
+        return { id: docRef.id, ...data };
       },
       update: async (id, data) => {
-        const board = getLocal('game_leaderboard');
-        const index = board.findIndex(b => b.id === id);
-        if (index > -1) {
-          board[index] = { ...board[index], ...data };
-          setLocal('game_leaderboard', board);
-        }
-        return board[index];
+        await updateDoc(doc(db, "leaderboard", id), data);
+      },
+      filter: async (filters) => {
+        const snap = await getDocs(query(collection(db, "leaderboard"), where("character_id", "==", filters.character_id)));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      }
+    },
+    Quest: {
+      filter: async (filters) => {
+        const snap = await getDocs(query(collection(db, "quests"), where("character_id", "==", filters.character_id)));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      },
+      create: async (data) => {
+        const docRef = await addDoc(collection(db, "quests"), data);
+        return { id: docRef.id, ...data };
+      },
+      update: async (id, data) => {
+        await updateDoc(doc(db, "quests", id), data);
       }
     }
   }
