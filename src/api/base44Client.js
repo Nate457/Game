@@ -1,7 +1,7 @@
 // src/api/base44Client.js
 import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, query, orderBy, limit, where, onSnapshot } from "firebase/firestore";
-import { getAuth, signInAnonymously } from "firebase/auth";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyD2VD5SlfT8skI1i0v7hN3xCdiXZ7LRY3g",
@@ -19,15 +19,20 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
+// FIX: Safely wait for Firebase to initialize the user before fetching data
+const getCurrentUser = () => new Promise((resolve, reject) => {
+  const unsubscribe = onAuthStateChanged(auth, user => {
+    unsubscribe();
+    if (user) resolve(user);
+    else signInAnonymously(auth).then(c => resolve(c.user)).catch(reject);
+  });
+});
+
 export const base44 = {
   auth: {
     me: async () => {
-      return new Promise((resolve, reject) => {
-        auth.onAuthStateChanged(user => {
-          if (user) resolve({ id: user.uid, name: "Player" });
-          else signInAnonymously(auth).then(c => resolve({ id: c.user.uid })).catch(reject);
-        });
-      });
+      const user = await getCurrentUser();
+      return { id: user.uid, name: "Player" };
     }
   },
   integrations: {
@@ -52,8 +57,9 @@ export const base44 = {
   entities: {
     Character: {
       list: async (sortStr) => {
+        const user = await getCurrentUser(); // Prevents the crash
         if (sortStr === "-created_date") {
-          const q = query(collection(db, "characters"), where("userId", "==", auth.currentUser.uid));
+          const q = query(collection(db, "characters"), where("userId", "==", user.uid));
           const snap = await getDocs(q);
           const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
           return docs.sort((a,b) => new Date(b.created_date) - new Date(a.created_date)).slice(0, 1);
@@ -64,9 +70,10 @@ export const base44 = {
         }
       },
       create: async (data) => {
+        const user = await getCurrentUser();
         const docRef = await addDoc(collection(db, "characters"), {
           ...data,
-          userId: auth.currentUser.uid,
+          userId: user.uid,
           created_date: new Date().toISOString()
         });
         return { id: docRef.id, ...data };
@@ -87,9 +94,18 @@ export const base44 = {
       },
       update: async (id, data) => {
         await updateDoc(doc(db, "leaderboard", id), data);
+      },
+      filter: async (filters) => {
+        const snap = await getDocs(query(collection(db, "leaderboard"), where("character_id", "==", filters.character_id)));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
     },
     Quest: {
+      // FIX: Restored the missing Quest filter function that caused the black screen
+      filter: async (filters) => {
+        const snap = await getDocs(query(collection(db, "quests"), where("character_id", "==", filters.character_id)));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      },
       create: async (data) => {
         const docRef = await addDoc(collection(db, "quests"), data);
         return { id: docRef.id, ...data };
@@ -98,7 +114,6 @@ export const base44 = {
         await updateDoc(doc(db, "quests", id), data);
       }
     },
-    // NEW: Real-time Co-op Session Management
     CoopSession: {
       create: async (data) => {
         const docRef = await addDoc(collection(db, "coop_sessions"), data);
