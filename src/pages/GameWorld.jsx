@@ -31,6 +31,9 @@ export default function GameWorld() {
   const [levelUpData, setLevelUpData] = useState(null);
   const [showCoopLobby, setShowCoopLobby] = useState(false);
   
+  // FIX: Added the missing state variables for coopPartner
+  const [coopPartner, setCoopPartner] = useState(null);
+  
   // NEW MULTIPLAYER STATE
   const [coopSessionId, setCoopSessionId] = useState(null);
   const [isHost, setIsHost] = useState(false);
@@ -38,7 +41,7 @@ export default function GameWorld() {
   const sessionStartRef = useRef(Date.now());
 
   // ── Load character ──────────────────────────────────────────
-const { data: characters, isLoading: charsLoading } = useQuery({
+  const { data: characters, isLoading: charsLoading } = useQuery({
     queryKey: ["characters"],
     queryFn: () => base44.entities.Character.list("-created_date", 1),
   });
@@ -404,7 +407,7 @@ Use a single emoji for the icon.`,
   };
 
   // ── Start coop ──────────────────────────────────────────────
-const handleJoinSession = (sessionId, hostStatus) => {
+  const handleJoinSession = (sessionId, hostStatus) => {
     setCoopSessionId(sessionId);
     setIsHost(hostStatus);
     setShowCoopLobby(false);
