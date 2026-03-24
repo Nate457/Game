@@ -1,6 +1,6 @@
 // src/api/base44Client.js
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, query, orderBy, limit, where } from "firebase/firestore";
+import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, query, orderBy, limit, where, onSnapshot } from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
 const firebaseConfig = {
@@ -53,14 +53,11 @@ export const base44 = {
     Character: {
       list: async (sortStr) => {
         if (sortStr === "-created_date") {
-          // Fetch this user's characters, then sort in JS to avoid Firebase Index errors
           const q = query(collection(db, "characters"), where("userId", "==", auth.currentUser.uid));
           const snap = await getDocs(q);
           const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-          // Sort by newest first and grab the top one
           return docs.sort((a,b) => new Date(b.created_date) - new Date(a.created_date)).slice(0, 1);
         } else {
-          // For the Co-op lobby
           const q = query(collection(db, "characters"), orderBy("level", "desc"), limit(50));
           const snap = await getDocs(q);
           return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -90,23 +87,36 @@ export const base44 = {
       },
       update: async (id, data) => {
         await updateDoc(doc(db, "leaderboard", id), data);
-      },
-      filter: async (filters) => {
-        const snap = await getDocs(query(collection(db, "leaderboard"), where("character_id", "==", filters.character_id)));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       }
     },
     Quest: {
-      filter: async (filters) => {
-        const snap = await getDocs(query(collection(db, "quests"), where("character_id", "==", filters.character_id)));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      },
       create: async (data) => {
         const docRef = await addDoc(collection(db, "quests"), data);
         return { id: docRef.id, ...data };
       },
       update: async (id, data) => {
         await updateDoc(doc(db, "quests", id), data);
+      }
+    },
+    // NEW: Real-time Co-op Session Management
+    CoopSession: {
+      create: async (data) => {
+        const docRef = await addDoc(collection(db, "coop_sessions"), data);
+        return { id: docRef.id, ...data };
+      },
+      update: async (id, data) => {
+        await updateDoc(doc(db, "coop_sessions", id), data);
+      },
+      getByCode: async (code) => {
+        const q = query(collection(db, "coop_sessions"), where("code", "==", code.toUpperCase()));
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+        return { id: snap.docs[0].id, ...snap.docs[0].data() };
+      },
+      listen: (id, callback) => {
+        return onSnapshot(doc(db, "coop_sessions", id), (doc) => {
+          if (doc.exists()) callback({ id: doc.id, ...doc.data() });
+        });
       }
     }
   }

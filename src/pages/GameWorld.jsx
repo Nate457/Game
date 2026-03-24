@@ -29,8 +29,12 @@ export default function GameWorld() {
   const [storyDialog, setStoryDialog] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [levelUpData, setLevelUpData] = useState(null);
-  const [coopPartner, setCoopPartner] = useState(null); // P2 character object
   const [showCoopLobby, setShowCoopLobby] = useState(false);
+  
+  // NEW MULTIPLAYER STATE
+  const [coopSessionId, setCoopSessionId] = useState(null);
+  const [isHost, setIsHost] = useState(false);
+
   const sessionStartRef = useRef(Date.now());
 
   // ── Load character ──────────────────────────────────────────
@@ -400,10 +404,11 @@ Use a single emoji for the icon.`,
   };
 
   // ── Start coop ──────────────────────────────────────────────
-  const handleStartCoop = (partner) => {
-    setCoopPartner(partner);
+const handleJoinSession = (sessionId, hostStatus) => {
+    setCoopSessionId(sessionId);
+    setIsHost(hostStatus);
     setShowCoopLobby(false);
-    setActiveTab("explore");
+    setActiveTab("combat"); // Drop them right into the waiting arena
   };
 
   // ── Handle combat end ────────────────────────────────────────
@@ -569,18 +574,19 @@ Use a single emoji for the icon.`,
       <HUD character={character} />
 
       <div className="flex-1 overflow-y-auto">
-        {currentEnemy && activeTab === "combat" ? (
+        {activeTab === "combat" ? (
           <RealTimeCombat
             character={character}
-            p2={coopPartner}
-            enemy={currentEnemy}
+            enemyData={currentEnemy} // Solo enemy
+            sessionId={coopSessionId} // Multiplayer ID
+            isHost={isHost}
             onCombatEnd={handleCombatEnd}
             onFlee={handleFlee}
           />
         ) : showCoopLobby ? (
           <CoopLobby
             myCharacter={character}
-            onStartCoop={handleStartCoop}
+            onJoinSession={handleJoinSession}
             onBack={() => setShowCoopLobby(false)}
           />
         ) : activeTab === "explore" ? (
