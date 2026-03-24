@@ -1,0 +1,241 @@
+{
+  "name": "Character",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string"
+    },
+    "class_type": {
+      "type": "string",
+      "enum": [
+        "warrior",
+        "mage",
+        "rogue",
+        "healer"
+      ]
+    },
+    "multiclass_spec": {
+      "type": "string",
+      "description": "Active multiclass spec id (unlocked at level 10)"
+    },
+    "level": {
+      "type": "number",
+      "default": 1
+    },
+    "xp": {
+      "type": "number",
+      "default": 0
+    },
+    "xp_to_next": {
+      "type": "number",
+      "default": 100
+    },
+    "max_hp": {
+      "type": "number",
+      "default": 100
+    },
+    "current_hp": {
+      "type": "number",
+      "default": 100
+    },
+    "max_mana": {
+      "type": "number",
+      "default": 50
+    },
+    "current_mana": {
+      "type": "number",
+      "default": 50
+    },
+    "attack": {
+      "type": "number",
+      "default": 10
+    },
+    "defense": {
+      "type": "number",
+      "default": 5
+    },
+    "speed": {
+      "type": "number",
+      "default": 10
+    },
+    "crit_chance": {
+      "type": "number",
+      "default": 5
+    },
+    "gold": {
+      "type": "number",
+      "default": 0
+    },
+    "current_zone": {
+      "type": "string",
+      "default": "whispering_woods"
+    },
+    "inventory": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "slot": {
+            "type": "string"
+          },
+          "stat_bonuses": {
+            "type": "object"
+          },
+          "stat_bonus": {
+            "type": "number"
+          },
+          "stat_type": {
+            "type": "string"
+          },
+          "rarity": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "level_req": {
+            "type": "number"
+          }
+        }
+      }
+    },
+    "equipped": {
+      "type": "object",
+      "properties": {
+        "weapon": {
+          "type": "string"
+        },
+        "armor": {
+          "type": "string"
+        },
+        "accessory": {
+          "type": "string"
+        },
+        "offhand": {
+          "type": "string"
+        }
+      }
+    },
+    "skill_tree": {
+      "type": "object",
+      "description": "Map of unlocked skill node IDs to true",
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
+    "skill_points": {
+      "type": "number",
+      "default": 0
+    },
+    "talent_points": {
+      "type": "number",
+      "default": 0
+    },
+    "story_chapter": {
+      "type": "number",
+      "default": 0
+    },
+    "story_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "story_context": {
+      "type": "string"
+    },
+    "side_quest_flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "reputation": {
+      "type": "object",
+      "properties": {
+        "forest_spirits": {
+          "type": "number",
+          "default": 0
+        },
+        "crimson_order": {
+          "type": "number",
+          "default": 0
+        },
+        "frost_conclave": {
+          "type": "number",
+          "default": 0
+        },
+        "void_hunters": {
+          "type": "number",
+          "default": 0
+        },
+        "merchant_guild": {
+          "type": "number",
+          "default": 0
+        }
+      }
+    },
+    "prestige_level": {
+      "type": "number",
+      "default": 0
+    },
+    "titles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "deaths": {
+      "type": "number",
+      "default": 0
+    },
+    "quests_completed": {
+      "type": "number",
+      "default": 0
+    },
+    "enemies_defeated": {
+      "type": "number",
+      "default": 0
+    },
+    "total_damage_dealt": {
+      "type": "number",
+      "default": 0
+    },
+    "unlocked_zones": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "last_active": {
+      "type": "string"
+    },
+    "playtime_minutes": {
+      "type": "number",
+      "default": 0
+    },
+    "combos_performed": {
+      "type": "number",
+      "default": 0,
+      "description": "Total solo combos fired"
+    },
+    "coop_combos_performed": {
+      "type": "number",
+      "default": 0,
+      "description": "Total coop combos fired"
+    }
+  },
+  "required": [
+    "name",
+    "class_type"
+  ]
+}

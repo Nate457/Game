@@ -1,0 +1,73 @@
+{
+  "name": "Quest",
+  "type": "object",
+  "properties": {
+    "character_id": {
+      "type": "string",
+      "description": "ID of the character this quest belongs to"
+    },
+    "title": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "objective": {
+      "type": "string"
+    },
+    "zone": {
+      "type": "string"
+    },
+    "enemies_to_defeat": {
+      "type": "number",
+      "default": 0
+    },
+    "enemies_defeated": {
+      "type": "number",
+      "default": 0
+    },
+    "xp_reward": {
+      "type": "number"
+    },
+    "gold_reward": {
+      "type": "number"
+    },
+    "item_reward": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "stat_bonus": {
+          "type": "number"
+        },
+        "stat_type": {
+          "type": "string"
+        },
+        "rarity": {
+          "type": "string"
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "completed",
+        "failed"
+      ],
+      "default": "active"
+    },
+    "story_text": {
+      "type": "string",
+      "description": "Narrative text for the quest"
+    }
+  },
+  "required": [
+    "character_id",
+    "title"
+  ]
+}

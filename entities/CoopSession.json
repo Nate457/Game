@@ -1,0 +1,51 @@
+{
+  "name": "CoopSession",
+  "type": "object",
+  "properties": {
+    "host_character_id": {
+      "type": "string"
+    },
+    "host_character_name": {
+      "type": "string"
+    },
+    "host_class": {
+      "type": "string"
+    },
+    "guest_character_id": {
+      "type": "string"
+    },
+    "guest_character_name": {
+      "type": "string"
+    },
+    "guest_class": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "waiting",
+        "active",
+        "in_combat",
+        "completed"
+      ],
+      "default": "waiting"
+    },
+    "current_zone": {
+      "type": "string"
+    },
+    "current_enemy": {
+      "type": "object"
+    },
+    "combat_state": {
+      "type": "object",
+      "description": "Shared combat state: hp values, primers, turn info"
+    },
+    "session_code": {
+      "type": "string",
+      "description": "6-char code guests use to join"
+    }
+  },
+  "required": [
+    "host_character_id"
+  ]
+}

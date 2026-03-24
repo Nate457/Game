@@ -1,0 +1,61 @@
+{
+  "name": "Leaderboard",
+  "type": "object",
+  "properties": {
+    "character_id": {
+      "type": "string"
+    },
+    "character_name": {
+      "type": "string"
+    },
+    "class_type": {
+      "type": "string"
+    },
+    "level": {
+      "type": "number",
+      "default": 1
+    },
+    "prestige_level": {
+      "type": "number",
+      "default": 0
+    },
+    "enemies_defeated": {
+      "type": "number",
+      "default": 0
+    },
+    "quests_completed": {
+      "type": "number",
+      "default": 0
+    },
+    "story_chapter": {
+      "type": "number",
+      "default": 0
+    },
+    "gold": {
+      "type": "number",
+      "default": 0
+    },
+    "total_damage_dealt": {
+      "type": "number",
+      "default": 0
+    },
+    "titles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "deaths": {
+      "type": "number",
+      "default": 0
+    },
+    "playtime_minutes": {
+      "type": "number",
+      "default": 0
+    }
+  },
+  "required": [
+    "character_id",
+    "character_name"
+  ]
+}
