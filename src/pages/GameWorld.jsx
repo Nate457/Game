@@ -25,7 +25,6 @@ export default function GameWorld() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
-  // 'explore' means no menus are open
   const [activeTab, setActiveTab] = useState("explore"); 
   const [storyDialog, setStoryDialog] = useState(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -77,22 +76,17 @@ export default function GameWorld() {
     queryClient.invalidateQueries({ queryKey: ["characters"] });
   };
 
-  // ── Firebase Co-Op Cleanup ──────────────────────────────────────────
   const handleLeaveCoop = async () => {
     if (!coopSessionId) return;
     const currentId = coopSessionId;
-    setCoopSessionId(null); // Immediately leave locally
-    
+    setCoopSessionId(null); 
     if (isHost) {
-      // If the host leaves, delete the room entirely
       try { await base44.entities.CoopSession.delete(currentId); } catch (e) { console.error(e); }
     } else {
-      // If the guest leaves, just clear the guest slot
       try { await base44.entities.CoopSession.update(currentId, { guest: null, guest_pos: null }); } catch (e) { console.error(e); }
     }
   };
 
-  // ── World Actions (Passed to OpenWorld Engine) ──────────────────────
   const handleEnemyDefeated = async (enemy, damageDealt) => {
     const boostedStats = applySkillTreeBonuses(
       { attack: character.attack, defense: character.defense, max_hp: character.max_hp, max_mana: character.max_mana, speed: character.speed, crit_chance: character.crit_chance },
@@ -118,7 +112,6 @@ export default function GameWorld() {
 
     const newStats = didLevelUp ? getStatsForLevel(character.class_type, newLevel) : {};
     
-    // Quest Progress
     const activeQuests = (quests || []).filter(q => q.status === "active" && q.zone === character.current_zone);
     for (const quest of activeQuests) {
       const newDefeated = (quest.enemies_defeated || 0) + 1;
@@ -171,73 +164,102 @@ export default function GameWorld() {
 
   const generateQuest = async () => {
     setIsGenerating(true);
-    const zone = ZONES[character.current_zone];
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `You are an NPC in ${zone.name}. Player is Lv ${character.level}. Generate a short side quest dialogue and quest data.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          narrative: { type: "string" }, npc_name: { type: "string" },
-          quest: {
-            type: "object",
-            properties: {
-              title: { type: "string" }, description: { type: "string" }, objective: { type: "string" },
-              enemies_to_defeat: { type: "number" }, xp_reward: { type: "number" }, gold_reward: { type: "number" },
-              item_reward: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  type: { type: "string", enum: ["weapon", "armor", "accessory"] },
-                  stat_bonus: { type: "number" },
-                  stat_type: { type: "string", enum: ["attack", "defense", "max_hp", "max_mana"] },
-                  rarity: { type: "string", enum: ["common", "uncommon", "rare", "epic"] },
-                  description: { type: "string" },
-                },
-              },
-            }
-          }
-        }
-      }
-    });
-    setIsGenerating(false);
-    setStoryDialog({ ...result, isStoryChapter: false });
-  };
-
-  const handleAdvanceStory = async () => {
-    const currentChapter = character.story_chapter || 0;
-    const nextChapterData = STORY_CHAPTERS[currentChapter];
-    if (!nextChapterData || character.level < nextChapterData.min_level) return;
-
-    setIsGenerating(true);
-    const result = await base44.integrations.Core.InvokeLLM({
-      prompt: `Generate narrative for Chapter ${nextChapterData.id}: "${nextChapterData.title}". Player Lv ${character.level}. And a main quest.`,
-      response_json_schema: {
-        type: "object",
-        properties: {
-          narrative: { type: "string" }, story_update: { type: "string" },
-          quest: {
-            type: "object",
-            properties: { 
-              title: { type: "string" }, description: { type: "string" }, objective: { type: "string" }, 
-              enemies_to_defeat: { type: "number" }, xp_reward: { type: "number" }, gold_reward: { type: "number" },
-              item_reward: {
-                type: "object",
-                properties: {
-                  name: { type: "string" },
-                  type: { type: "string", enum: ["weapon", "armor", "accessory"] },
-                  stat_bonus: { type: "number" },
-                  stat_type: { type: "string", enum: ["attack", "defense", "max_hp", "max_mana"] },
-                  rarity: { type: "string", enum: ["common", "uncommon", "rare", "epic", "legendary"] },
-                  description: { type: "string" },
+    try {
+      const zone = ZONES[character.current_zone];
+      const result = await base44.integrations.Core.InvokeLLM({
+        // FIX: Re-added the character's memory context to the AI so it stays internally consistent
+        prompt: `You are an NPC in ${zone.name}. Player is Lv ${character.level}. 
+Story context so far: ${character.story_context || "A new adventure begins."}
+Generate a short side quest dialogue and quest data. Include a 'story_update' field that summarizes the story so far and seamlessly includes this new encounter, so you remember it next time.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            narrative: { type: "string" }, npc_name: { type: "string" },
+            story_update: { type: "string" }, // FIX: Save AI memory
+            quest: {
+              type: "object",
+              properties: {
+                title: { type: "string" }, description: { type: "string" }, objective: { type: "string" },
+                enemies_to_defeat: { type: "number" }, xp_reward: { type: "number" }, gold_reward: { type: "number" },
+                item_reward: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    type: { type: "string", enum: ["weapon", "armor", "accessory"] },
+                    stat_bonus: { type: "number" },
+                    stat_type: { type: "string", enum: ["attack", "defense", "max_hp", "max_mana"] },
+                    rarity: { type: "string", enum: ["common", "uncommon", "rare", "epic"] },
+                    description: { type: "string" },
+                  },
                 },
               }
             }
           }
         }
-      }
-    });
-    setIsGenerating(false);
-    setStoryDialog({ ...result, title: `Chapter ${currentChapter}: ${nextChapterData.title}`, isStoryChapter: true, chapterId: currentChapter, chapterKey: nextChapterData.key });
+      });
+      setStoryDialog({ ...result, isStoryChapter: false });
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      alert("The AI failed to generate the quest. Please try talking to them again.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleAdvanceStory = async () => {
+    const currentChapter = character.story_chapter || 0;
+    const nextChapterData = STORY_CHAPTERS[currentChapter];
+    if (!nextChapterData) return;
+
+    if (character.level < nextChapterData.min_level) {
+      setStoryDialog({
+        title: "Not Yet Ready",
+        narrative: `The path ahead requires you to reach Level ${nextChapterData.min_level}. Train harder, gain experience, and prove your worth before facing what lies in "${nextChapterData.title}".`,
+        quest: null,
+        isStoryChapter: false,
+      });
+      return;
+    }
+
+    setIsGenerating(true);
+    try {
+      const result = await base44.integrations.Core.InvokeLLM({
+        // FIX: Passing the full story memory
+        prompt: `Generate narrative for Chapter ${nextChapterData.id}: "${nextChapterData.title}". Player Lv ${character.level}.
+Story context so far: ${character.story_context || "A new adventure begins."}
+Continue the story logically from the context. Generate a main quest, and a 'story_update' summarizing the ENTIRE story so far including this new chapter so you don't forget previous events.`,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            narrative: { type: "string" }, story_update: { type: "string" },
+            quest: {
+              type: "object",
+              properties: { 
+                title: { type: "string" }, description: { type: "string" }, objective: { type: "string" }, 
+                enemies_to_defeat: { type: "number" }, xp_reward: { type: "number" }, gold_reward: { type: "number" },
+                item_reward: {
+                  type: "object",
+                  properties: {
+                    name: { type: "string" },
+                    type: { type: "string", enum: ["weapon", "armor", "accessory"] },
+                    stat_bonus: { type: "number" },
+                    stat_type: { type: "string", enum: ["attack", "defense", "max_hp", "max_mana"] },
+                    rarity: { type: "string", enum: ["common", "uncommon", "rare", "epic", "legendary"] },
+                    description: { type: "string" },
+                  },
+                }
+              }
+            }
+          }
+        }
+      });
+      setStoryDialog({ ...result, title: `Chapter ${currentChapter}: ${nextChapterData.title}`, isStoryChapter: true, chapterId: currentChapter, chapterKey: nextChapterData.key });
+    } catch (error) {
+      console.error("AI Generation Error:", error);
+      alert("The AI narrator lost its train of thought. Please click the story NPC to try again.");
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const acceptQuest = async (quest) => {
@@ -247,9 +269,22 @@ export default function GameWorld() {
       xp_reward: quest.xp_reward, gold_reward: quest.gold_reward, status: "active",
     });
 
-    if (storyDialog.isStoryChapter) {
-      await updateCharacter({ story_chapter: storyDialog.chapterId + 1, story_context: storyDialog.story_update });
+    const updates = {};
+    // FIX: Update character's AI memory for BOTH Side Quests and Story Chapters
+    if (storyDialog.story_update) {
+      updates.story_context = storyDialog.story_update;
     }
+    if (storyDialog.isStoryChapter) {
+      updates.story_chapter = storyDialog.chapterId + 1;
+    }
+
+    if (Object.keys(updates).length > 0) {
+      await updateCharacter(updates);
+    }
+
+    // FIX: Invalidate the cache so the UI actually refreshes to show the new quest
+    queryClient.invalidateQueries({ queryKey: ["quests"] });
+    
     setStoryDialog(null);
     setActiveTab("quests");
   };
@@ -258,8 +293,6 @@ export default function GameWorld() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-slate-950 relative flex flex-col">
-      
-      {/* 1. The Persistent Open World Layer (Bottom) */}
       <div className="absolute inset-0 z-0">
         <OpenWorld 
           character={character} 
@@ -275,7 +308,6 @@ export default function GameWorld() {
         />
       </div>
 
-      {/* 2. Persistent HUD & Nav Layers (Top/Bottom Overlays) */}
       <div className="absolute top-0 left-0 right-0 z-40 pointer-events-none">
         <div className="pointer-events-auto"><HUD character={character} /></div>
       </div>
@@ -284,7 +316,6 @@ export default function GameWorld() {
         <div className="pointer-events-auto"><GameNav activeTab={activeTab} onTabChange={setActiveTab} combatActive={false} /></div>
       </div>
 
-      {/* 3. The Menu Overlays (Middle, blurs world) */}
       <AnimatePresence>
         {activeTab !== "explore" && (
           <motion.div 
@@ -302,14 +333,13 @@ export default function GameWorld() {
               {activeTab === "map" && <WorldMap character={character} onSelectZone={(z) => { updateCharacter({ current_zone: z }); setActiveTab("explore"); }} />}
               {activeTab === "quests" && <QuestLog quests={quests} />}
               {activeTab === "story" && <StoryJournal character={character} />}
-              {activeTab === "character" && <CharacterPanel character={character} onUnlockSkill={async (id) => { /* Add skill lockic back if needed */ }} onSelectSpec={async (id) => updateCharacter({ multiclass_spec: id })} />}
+              {activeTab === "character" && <CharacterPanel character={character} onUnlockSkill={async (id) => { }} onSelectSpec={async (id) => updateCharacter({ multiclass_spec: id })} />}
               {activeTab === "leaderboard" && <LeaderboardView currentCharacter={character} />}
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Coop Lobby Modal */}
       {showCoopLobby && (
         <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center pointer-events-auto">
           <CoopLobby 
@@ -320,7 +350,6 @@ export default function GameWorld() {
         </div>
       )}
 
-      {/* Story Modals */}
       <StoryDialog story={storyDialog} onClose={() => setStoryDialog(null)} onAcceptQuest={acceptQuest} />
       <LevelUpOverlay data={levelUpData} onClose={() => setLevelUpData(null)} />
     </div>

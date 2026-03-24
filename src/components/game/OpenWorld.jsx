@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { CLASSES, applySkillTreeBonuses, ZONES } from "@/lib/gameData";
 import { Button } from "@/components/ui/button";
-import { Users, Copy } from "lucide-react";
+import { Users, Copy, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 
 const MAP_SIZE = 2500;
@@ -15,7 +15,6 @@ export default function OpenWorld({
   const zone = ZONES[character.current_zone] || ZONES.whispering_woods;
   const cls = CLASSES[character.class_type];
 
-  // Local State
   const [player, setPlayer] = useState({ x: MAP_SIZE/2, y: MAP_SIZE/2, tx: MAP_SIZE/2, ty: MAP_SIZE/2, hp: character.current_hp, maxHp: character.max_hp });
   const [mana, setMana] = useState(character.current_mana);
   const [partner, setPartner] = useState(null);
@@ -24,13 +23,10 @@ export default function OpenWorld({
   const [cooldowns, setCooldowns] = useState({});
   const [logs, setLogs] = useState(["Welcome to the Realm of Echoes."]);
   const [roomCode, setRoomCode] = useState("");
-  
-  // FIX: Stores the NPC we clicked on until we are close enough to talk
   const [pendingInteraction, setPendingInteraction] = useState(null);
 
   const mapRef = useRef(null);
 
-  // Static NPCs
   const npcs = [
     { id: "story", name: "Elder Lumina", type: "Story", x: MAP_SIZE/2 - 100, y: MAP_SIZE/2 - 100, icon: "🧙‍♀️", color: "text-blue-400", action: onAdvanceStory },
     { id: "quest", name: "Bounty Board", type: "Quests", x: MAP_SIZE/2 + 100, y: MAP_SIZE/2 - 50, icon: "📜", color: "text-amber-400", action: onGenerateQuest },
@@ -38,21 +34,19 @@ export default function OpenWorld({
 
   const addLog = (msg) => setLogs(p => [msg, ...p].slice(0, 5));
 
-  // --- GAME LOOP (Movement & Enemy Spawning) ---
+  // --- GAME LOOP ---
   useEffect(() => {
     const loop = setInterval(() => {
-      // 1. Move Player
       setPlayer(p => {
         const dx = p.tx - p.x;
         const dy = p.ty - p.y;
         const dist = Math.hypot(dx, dy);
-        const speed = 12; // Move speed
+        const speed = 12; 
         
         if (dist <= speed) return { ...p, x: p.tx, y: p.ty };
         return { ...p, x: p.x + (dx/dist)*speed, y: p.y + (dy/dist)*speed };
       });
 
-      // 2. Cooldowns & Mana
       setCooldowns(c => {
         const next = { ...c };
         Object.keys(next).forEach(k => next[k] = Math.max(0, next[k] - 100));
@@ -60,7 +54,6 @@ export default function OpenWorld({
       });
       setMana(m => Math.min(character.max_mana, m + 1));
 
-      // 3. Enemy AI
       setEnemies(ens => ens.map(e => {
         if (e.hp <= 0) return e;
         const distToPlayer = Math.hypot(e.x - player.x, e.y - player.y);
@@ -79,10 +72,9 @@ export default function OpenWorld({
     if (pendingInteraction) {
       const dist = Math.hypot(pendingInteraction.x - player.x, pendingInteraction.y - player.y);
       if (dist <= 150) {
-        addLog(`Talking to ${pendingInteraction.name}...`);
         pendingInteraction.action();
-        setPendingInteraction(null); // Clear the interaction so it doesn't loop
-        setPlayer(p => ({ ...p, tx: p.x, ty: p.y })); // Stop walking immediately
+        setPendingInteraction(null); 
+        setPlayer(p => ({ ...p, tx: p.x, ty: p.y })); 
       }
     }
   }, [player.x, player.y, pendingInteraction]);
@@ -120,13 +112,11 @@ export default function OpenWorld({
     }, 500);
 
     const unsub = base44.entities.CoopSession.listen(sessionId, (data) => {
-      // FIX: If data is null, the host deleted the room! Kick the guest safely.
       if (!data) {
         addLog("Room was closed by host.");
         onLeaveCoop();
         return;
       }
-
       if (data.code) setRoomCode(data.code);
       if (isHost && data.guest && data.guest_pos) setPartner({ ...data.guest, ...data.guest_pos });
       if (!isHost && data.host && data.host_pos) setPartner({ ...data.host, ...data.host_pos });
@@ -141,19 +131,18 @@ export default function OpenWorld({
     const clickY = e.clientY - window.innerHeight / 2;
     setPlayer(p => ({ ...p, tx: p.x + clickX, ty: p.y + clickY }));
     setTarget(null);
-    setPendingInteraction(null); // Cancel talking if user clicks away
+    setPendingInteraction(null);
   };
 
   const interactWithNPC = (npc) => {
-    if (isGenerating) return addLog("Please wait... generating AI dialogue.");
+    if (isGenerating) return addLog("Please wait... AI is writing dialogue.");
     
     const dist = Math.hypot(npc.x - player.x, npc.y - player.y);
     if (dist > 150) {
       addLog(`Walking to ${npc.name}...`);
       setPlayer(p => ({ ...p, tx: npc.x, ty: npc.y + 60 }));
-      setPendingInteraction(npc); // Queue it up to trigger when close enough
+      setPendingInteraction(npc);
     } else {
-      addLog(`Talking to ${npc.name}...`);
       npc.action();
     }
   };
@@ -181,7 +170,7 @@ export default function OpenWorld({
           if (newHp <= 0) {
             addLog(`${e.name} defeated!`);
             onEnemyDefeated(e, dmg);
-            setTarget(null);
+            setTarget(null); // FIX: Clear target frame if enemy dies
           }
           return { ...e, hp: newHp };
         }
@@ -194,7 +183,6 @@ export default function OpenWorld({
     }
   };
 
-  // --- KEYBOARD BINDINGS (1-5) ---
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -211,6 +199,9 @@ export default function OpenWorld({
   const cameraX = window.innerWidth / 2 - player.x;
   const cameraY = window.innerHeight / 2 - player.y;
 
+  // FIX: Retrieve the exact, up-to-date enemy object from the array for the UI target frame
+  const activeTarget = target ? (enemies.find(e => e.id === target.id) || target) : null;
+
   return (
     <div className="fixed inset-0 bg-slate-950 overflow-hidden text-foreground select-none" onClick={handleMapClick}>
       {/* WORLD MAP LAYER */}
@@ -226,7 +217,6 @@ export default function OpenWorld({
           backgroundColor: '#0f172a'
         }}
       >
-        {/* NPCs */}
         {npcs.map(npc => (
           <div 
             key={npc.id} 
@@ -234,7 +224,7 @@ export default function OpenWorld({
             style={{ left: npc.x, top: npc.y }}
             onClick={(e) => { e.stopPropagation(); interactWithNPC(npc); }}
           >
-            <div className={`text-4xl ${isGenerating ? 'animate-pulse' : 'animate-bounce'}`}>{npc.icon}</div>
+            <div className="text-4xl animate-bounce">{npc.icon}</div>
             <div className="bg-black/80 px-2 py-0.5 rounded text-[10px] font-bold mt-1 text-center border border-border/50">
               <div className={npc.color}>{npc.name}</div>
               <div className="text-muted-foreground">{npc.type}</div>
@@ -242,7 +232,6 @@ export default function OpenWorld({
           </div>
         ))}
 
-        {/* Enemies */}
         {enemies.filter(e => e.hp > 0).map(enemy => (
           <div 
             key={enemy.id} 
@@ -260,7 +249,6 @@ export default function OpenWorld({
           </div>
         ))}
 
-        {/* Co-op Partner */}
         {partner && (
           <div className="absolute -ml-6 -mt-6 w-12 h-12 flex flex-col items-center justify-center pointer-events-none transition-all duration-500" style={{ left: partner.x, top: partner.y }}>
             <div className="text-3xl drop-shadow-[0_0_10px_rgba(16,185,129,0.8)]">{CLASSES[partner.class]?.icon || "👤"}</div>
@@ -268,13 +256,11 @@ export default function OpenWorld({
           </div>
         )}
 
-        {/* MY PLAYER */}
         <div className="absolute -ml-6 -mt-6 w-12 h-12 flex flex-col items-center justify-center pointer-events-none z-50" style={{ left: player.x, top: player.y }}>
           <div className="text-3xl drop-shadow-[0_0_15px_rgba(59,130,246,0.8)]">{cls?.icon}</div>
           <div className="bg-blue-950/80 px-2 py-0.5 rounded text-[10px] font-bold mt-1 text-blue-400">{character.name}</div>
         </div>
         
-        {/* Click Target Indicator */}
         {player.x !== player.tx && (
           <motion.div 
             className="absolute -ml-2 -mt-2 w-4 h-4 rounded-full border-2 border-primary pointer-events-none"
@@ -284,6 +270,14 @@ export default function OpenWorld({
           />
         )}
       </motion.div>
+
+      {/* OVERLAY: AI Loading State */}
+      {isGenerating && (
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 bg-black/80 backdrop-blur-md border border-primary/50 text-primary px-6 py-3 rounded-full flex items-center gap-3 z-50 shadow-[0_0_20px_rgba(59,130,246,0.3)]">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          <span className="font-heading font-bold tracking-wider uppercase text-sm">AI Narrator is writing...</span>
+        </div>
+      )}
 
       {/* OVERLAY: Zone & Multiplayer Info */}
       <div className="absolute top-20 right-4 flex flex-col gap-2 items-end z-40 pointer-events-none">
@@ -338,10 +332,11 @@ export default function OpenWorld({
       {/* OVERLAY: Action Bar (Bottom Center) */}
       <div className="absolute bottom-20 left-1/2 -translate-x-1/2 bg-card/90 backdrop-blur-xl border border-border rounded-2xl p-3 shadow-2xl flex flex-col items-center no-move z-40">
         
-        {target && (
+        {/* Target Frame linked directly to activeTarget */}
+        {activeTarget && (
           <div className="w-full mb-3 px-3 py-1.5 bg-red-950/30 border border-red-900/50 rounded-lg flex justify-between items-center">
-            <span className="text-xs font-bold text-red-400">🎯 {target.name}</span>
-            <span className="text-xs text-red-200">{target.hp}/{target.maxHp} HP</span>
+            <span className="text-xs font-bold text-red-400">🎯 {activeTarget.name}</span>
+            <span className="text-xs text-red-200">{activeTarget.hp}/{activeTarget.maxHp} HP</span>
           </div>
         )}
 

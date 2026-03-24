@@ -13,13 +13,13 @@ const firebaseConfig = {
   measurementId: "G-STBQ1JTVHX"
 };
 
-const GEMINI_API_KEY = "AIzaSyCTBCPcL6GuZWDI3T9FhSUaQOyZs2QTG-Q";
+const GEMINI_API_KEY = "AIzaSyAB-VHk5Dq7-i-wtnzxQkXXZaReyz7iRaI";
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 
-// FIX: Safely wait for Firebase to initialize the user before fetching data
+// Safely wait for Firebase to initialize the user before fetching data
 const getCurrentUser = () => new Promise((resolve, reject) => {
   const unsubscribe = onAuthStateChanged(auth, user => {
     unsubscribe();
@@ -38,18 +38,28 @@ export const base44 = {
   integrations: {
     Core: {
       InvokeLLM: async ({ prompt, response_json_schema }) => {
-        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
+        // FIX: The 400 Bad Request is caused by the API's strict OpenAPI schema validation.
+        // We inject the schema into the prompt directly to bypass the error entirely.
+        const robustPrompt = `${prompt}\n\nIMPORTANT: You must return ONLY valid JSON. The JSON must strictly match this schema structure:\n${JSON.stringify(response_json_schema, null, 2)}`;
+        
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            contents: [{ parts: [{ text: robustPrompt }] }],
             generationConfig: {
-              responseMimeType: "application/json",
-              responseSchema: response_json_schema
+              responseMimeType: "application/json"
             }
           })
         });
+        
         const data = await res.json();
+        
+        if (!res.ok) {
+          console.error("Gemini API Error:", data);
+          throw new Error(`AI Generation Failed: ${res.status}`);
+        }
+        
         return JSON.parse(data.candidates[0].content.parts[0].text);
       }
     }
@@ -57,7 +67,7 @@ export const base44 = {
   entities: {
     Character: {
       list: async (sortStr) => {
-        const user = await getCurrentUser(); // Prevents the crash
+        const user = await getCurrentUser();
         if (sortStr === "-created_date") {
           const q = query(collection(db, "characters"), where("userId", "==", user.uid));
           const snap = await getDocs(q);
@@ -101,7 +111,6 @@ export const base44 = {
       }
     },
     Quest: {
-      // FIX: Restored the missing Quest filter function that caused the black screen
       filter: async (filters) => {
         const snap = await getDocs(query(collection(db, "quests"), where("character_id", "==", filters.character_id)));
         return snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -131,6 +140,7 @@ export const base44 = {
       listen: (id, callback) => {
         return onSnapshot(doc(db, "coop_sessions", id), (doc) => {
           if (doc.exists()) callback({ id: doc.id, ...doc.data() });
+          else callback(null);
         });
       }
     }
