@@ -3,7 +3,6 @@ import { initializeApp } from "firebase/app";
 import { getFirestore, collection, getDocs, addDoc, updateDoc, doc, query, orderBy, limit, where } from "firebase/firestore";
 import { getAuth, signInAnonymously } from "firebase/auth";
 
-// 1. TODO: GET YOUR FIREBASE CONFIG FROM console.firebase.google.com
 const firebaseConfig = {
   apiKey: "AIzaSyD2VD5SlfT8skI1i0v7hN3xCdiXZ7LRY3g",
   authDomain: "game-10c46.firebaseapp.com",
@@ -14,7 +13,6 @@ const firebaseConfig = {
   measurementId: "G-STBQ1JTVHX"
 };
 
-// 2. TODO: GET A FREE GEMINI API KEY FROM aistudio.google.com
 const GEMINI_API_KEY = "AIzaSyCy39_ATqV3uVFhdX4XVF23GhalcpjAQhM";
 
 const app = initializeApp(firebaseConfig);
@@ -54,16 +52,19 @@ export const base44 = {
   entities: {
     Character: {
       list: async (sortStr) => {
-        let q = collection(db, "characters");
-        // If sorting by created_date, the game is looking for YOUR character
         if (sortStr === "-created_date") {
-          q = query(q, where("userId", "==", auth.currentUser.uid), orderBy("created_date", "desc"), limit(1));
+          // Fetch this user's characters, then sort in JS to avoid Firebase Index errors
+          const q = query(collection(db, "characters"), where("userId", "==", auth.currentUser.uid));
+          const snap = await getDocs(q);
+          const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          // Sort by newest first and grab the top one
+          return docs.sort((a,b) => new Date(b.created_date) - new Date(a.created_date)).slice(0, 1);
         } else {
-          // Otherwise, it's looking for all characters for the Co-op lobby
-          q = query(q, orderBy("level", "desc"), limit(50));
+          // For the Co-op lobby
+          const q = query(collection(db, "characters"), orderBy("level", "desc"), limit(50));
+          const snap = await getDocs(q);
+          return snap.docs.map(d => ({ id: d.id, ...d.data() }));
         }
-        const snap = await getDocs(q);
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
       },
       create: async (data) => {
         const docRef = await addDoc(collection(db, "characters"), {

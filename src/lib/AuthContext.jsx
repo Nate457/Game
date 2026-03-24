@@ -7,7 +7,6 @@ const AuthContext = createContext();
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [isLoadingAuth, setIsLoadingAuth] = useState(true);
-  const [isLoadingPublicSettings] = useState(false);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -28,7 +27,8 @@ export const AuthProvider = ({ children }) => {
       user, 
       isAuthenticated: !!user, 
       isLoadingAuth,
-      isLoadingPublicSettings,
+      isLoadingPublicSettings: false, // Prevents App.jsx from being stuck
+      authError: null
     }}>
       {children}
     </AuthContext.Provider>

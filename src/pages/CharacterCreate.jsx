@@ -5,10 +5,9 @@ import { CLASSES, getStatsForLevel } from "@/lib/gameData";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-// Added Wind and Target to the imports
-import { Sword, Shield, Heart, Zap, ChevronRight, Wind, Target } from "lucide-react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Sword, Shield, Heart, Zap, ChevronRight, Wind, Target, Play, ArrowLeft } from "lucide-react";
 
-// Added speed and crit_chance to the icon dictionary
 const statIcons = { 
   max_hp: Heart, 
   max_mana: Zap, 
@@ -19,15 +18,27 @@ const statIcons = {
 };
 
 export default function CharacterCreate() {
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+  
   const [name, setName] = useState("");
   const [selectedClass, setSelectedClass] = useState(null);
   const [creating, setCreating] = useState(false);
-  const navigate = useNavigate();
+  const [forceNew, setForceNew] = useState(false);
+
+  // Check if the player already has a character saved
+  const { data: characters, isLoading } = useQuery({
+    queryKey: ["characters"],
+    queryFn: () => base44.entities.Character.list("-created_date", 1),
+  });
+
+  const existingCharacter = characters?.[0];
 
   const handleCreate = async () => {
     if (!name.trim() || !selectedClass) return;
     setCreating(true);
     const stats = getStatsForLevel(selectedClass, 1);
+    
     await base44.entities.Character.create({
       name: name.trim(),
       class_type: selectedClass,
@@ -46,8 +57,59 @@ export default function CharacterCreate() {
       story_context: "A new adventurer has arrived in the Whispering Woods, seeking glory and answers about the growing darkness.",
       unlocked_zones: ["whispering_woods"],
     });
+
+    // CRITICAL FIX: Wipe the cache so GameWorld knows the character exists!
+    await queryClient.invalidateQueries({ queryKey: ["characters"] });
+    
     navigate("/game");
   };
+
+  const handleContinue = () => {
+    navigate("/game");
+  };
+
+  // Show a loading spinner while checking the database
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-8 h-8 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Welcome Back / Continue Screen
+  if (existingCharacter && !forceNew) {
+    const cls = CLASSES[existingCharacter.class_type];
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-secondary to-background">
+        <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-md relative z-10">
+          <div className="text-center mb-8">
+            <h1 className="font-heading text-5xl font-bold text-primary tracking-wider mb-2">REALM OF ECHOES</h1>
+          </div>
+
+          <div className="bg-card/80 backdrop-blur-xl border border-border/50 rounded-2xl p-8 shadow-2xl text-center">
+            <h2 className="font-heading text-2xl font-bold text-foreground mb-6">Welcome Back</h2>
+
+            <div className="bg-muted/50 border border-border/50 rounded-xl p-6 mb-6">
+              <div className="text-6xl mb-3">{cls?.icon}</div>
+              <h3 className="font-heading text-xl font-bold text-primary mb-1">{existingCharacter.name}</h3>
+              <p className="text-muted-foreground text-sm">Level {existingCharacter.level} {cls?.name}</p>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button onClick={handleContinue} className="w-full h-12 text-lg font-heading tracking-wider">
+                <Play className="w-5 h-5 mr-2" fill="currentColor" />
+                Continue Journey
+              </Button>
+              <Button onClick={() => setForceNew(true)} variant="outline" className="w-full text-muted-foreground">
+                Create New Hero
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-background via-secondary to-background">
@@ -68,7 +130,15 @@ export default function CharacterCreate() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-3xl relative z-10"
       >
-        <div className="text-center mb-10">
+        <div className="text-center mb-10 relative">
+          {existingCharacter && forceNew && (
+            <button 
+              onClick={() => setForceNew(false)} 
+              className="absolute left-0 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground flex items-center gap-1 text-sm font-heading"
+            >
+              <ArrowLeft className="w-4 h-4" /> Back
+            </button>
+          )}
           <h1 className="font-heading text-5xl md:text-6xl font-bold text-primary tracking-wider mb-3">
             REALM OF ECHOES
           </h1>
@@ -129,9 +199,7 @@ export default function CharacterCreate() {
                   <div className="grid grid-cols-2 gap-3">
                     {Object.entries(getStatsForLevel(selectedClass, 1)).map(([stat, val]) => {
                       const Icon = statIcons[stat];
-                      
-                      // Added null guard to prevent crashes
-                      if (!Icon) return null; 
+                      if (!Icon) return null;
 
                       return (
                         <div key={stat} className="flex items-center gap-2">

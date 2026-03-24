@@ -34,10 +34,9 @@ export default function GameWorld() {
   const sessionStartRef = useRef(Date.now());
 
   // ── Load character ──────────────────────────────────────────
-  const { data: characters, isLoading: charsLoading } = useQuery({
+const { data: characters, isLoading: charsLoading } = useQuery({
     queryKey: ["characters"],
     queryFn: () => base44.entities.Character.list("-created_date", 1),
-    initialData: [],
   });
   const character = characters?.[0];
 
